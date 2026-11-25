@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live Packet Sniffer</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 20px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 6px 12px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #334155;
+    }
+    input {
+      padding: 6px 10px;
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: #f8fafc;
+      border-radius: 6px;
+      min-width: 220px;
+    }
+    .status {
+      font-size: 0.9rem;
+      color: #94a3b8;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      background: #1e293b;
+    }
+    th, td {
+      padding: 8px 10px;
+      border: 1px solid #334155;
+      text-align: left;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    th {
+      background: #0f172a;
+      position: sticky;
+      top: 0;
+    }
+    tr.hidden-row {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Live Packet Sniffer</h2>
+
+  <div class="toolbar">
+    <button id="togglePauseBtn" type="button">Pause</button>
+    <button id="clearBtn" type="button">Clear Table</button>
+    <input id="filterInput" type="text" placeholder="Filter by IP, MAC, or protocol..." />
+    <span id="statusText" class="status">Connecting...</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Version</th>
+        <th>Protocol</th>
+        <th>Source IP</th>
+        <th>Destination IP</th>
+        <th>Source MAC</th>
+        <th>Destination MAC</th>
+      </tr>
+    </thead>
+    <tbody id="packetTableBody"></tbody>
+  </table>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const socket = io({
+      transports: ["websocket", "polling"]
+    });
+
+    const tbody = document.getElementById("packetTableBody");
+    const statusText = document.getElementById("statusText");
+    const togglePauseBtn = document.getElementById("togglePauseBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const filterInput = document.getElementById("filterInput");
+
+    const MAX_ROWS = 200;
+    let isPaused = false;
+    let packetCounter = 0;
+
+    function matchesFilter(packet, query) {
+      if (!query) return true;
+      const haystack = [
+        packet.version,
+        packet.protocol,
+        packet.source_ip_address,
+        packet.destination_ip_address,
+        packet.source_mac,
+        packet.destination_mac
+      ]
+        .filter((val) => val !== null && val !== undefined)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    }
+
+    function applyFilterToAllRows() {
+      const query = filterInput.value.trim().toLowerCase();
+      for (const row of tbody.rows) {
+        const searchText = row.dataset.search || "";
+        row.classList.toggle("hidden-row", query !== "" && !searchText.includes(query));
+      }
+    }
+
+    function appendPacketRow(packet) {
+      if (isPaused || !packet) return;
+
+      packetCounter += 1;
+      const query = filterInput.value.trim().toLowerCase();
+
+      const values = [
+        packet.version ?? "-",
+        packet.protocol ?? "-",
+        packet.source_ip_address ?? "-",
+        packet.destination_ip_address ?? "-",
+        packet.source_mac ?? "-",
+        packet.destination_mac ?? "-"
+      ];
+
+      const searchText = values.join(" ").toLowerCase();
+      const tr = document.createElement("tr");
+      tr.dataset.search = searchText;
+
+      if (query && !searchText.includes(query)) {
+        tr.classList.add("hidden-row");
+      }
+
+      const cells = [String(packetCounter), ...values];
+      for (const text of cells) {
+        const td = document.createElement("td");
+        td.textContent = text; 
+        tr.appendChild(td);
+      }
+
+      tbody.appendChild(tr);
+
+ 
+      while (tbody.rows.length > MAX_ROWS) {
+        tbody.deleteRow(0);
+      }
+    }
+
+    socket.on("connect", () => {
+      statusText.textContent = `Connected (${socket.io.engine.transport.name})`;
+    });
+
+    socket.on("disconnect", () => {
+      statusText.textContent = "Disconnected";
+    });
+
+    socket.on("connect_error", (err) => {
+      statusText.textContent = `Connection error: ${err.message}`;
+    });
+
+    
+    socket.on("sniff_list", (packets) => {
+      tbody.innerHTML = "";
+      packetCounter = 0;
+      if (Array.isArray(packets)) {
+        packets.forEach(appendPacketRow);
+      }
+    });
+
+    
+    socket.on("new_packet", (packet) => {
+      appendPacketRow(packet);
+    });
+
+    togglePauseBtn.addEventListener("click", () => {
+      isPaused = !isPaused;
+      togglePauseBtn.textContent = isPaused ? "Resume" : "Pause";
+      statusText.textContent = isPaused ? "Paused (live display frozen)" : "Live";
+    });
+
+    clearBtn.addEventListener("click", () => {
+      tbody.innerHTML = "";
+      packetCounter = 0;
+    });
+
+    filterInput.addEventListener("input", applyFilterToAllRows);
+  </script>
+</body>
+</html>

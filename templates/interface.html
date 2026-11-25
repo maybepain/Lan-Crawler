@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Select Interface</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 20px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .card {
+      max-width: 440px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    select {
+      width: 100%;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    button[type="submit"] {
+      padding: 8px 16px;
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    button[type="submit"]:hover {
+      background: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <form method="POST" action="{{ url_for('interface_page') }}">
+      <label for="interface-select">Network Interface</label>
+      <select name="interface" id="interface-select">
+        {% for interface in interfaces_list %}
+          <option value="{{ interface }}">{{ interface }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Select</button>
+    </form>
+  </div>
+</body>
+</html>
